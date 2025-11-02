@@ -1,32 +1,28 @@
 "use client";
-import React from "react";
-import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Divider } from "@mui/material";
+import React, { useEffect } from "react";
+import {
+  Box,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Divider,
+  CircularProgress,
+} from "@mui/material";
+import {useUserStore} from "../../store/UserSlice"; // ✅ Zustand store import
 
 export default function OrderPage() {
-  const orders = [
-    {
-      id: "ORD12345",
-      date: "2025-11-02",
-      address: "221B Baker Street, London",
-      status: "Delivered",
-      total: 2999,
-      products: [
-        { name: "Classic White Shirt", qty: 2, size: "M", price: 899 },
-        { name: "Denim Jeans", qty: 1, size: "32", price: 1200 },
-      ],
-    },
-    {
-      id: "ORD12346",
-      date: "2025-10-28",
-      address: "742 Evergreen Terrace, Springfield",
-      status: "Pending",
-      total: 1899,
-      products: [
-        { name: "Black Hoodie", qty: 1, size: "L", price: 999 },
-        { name: "Joggers", qty: 1, size: "M", price: 900 },
-      ],
-    },
-  ];
+  const { orders, loading, error, fetchUserOrders } = useUserStore();
+
+  // 🔹 Fetch orders on mount
+  useEffect(() => {
+    fetchUserOrders();
+  }, [fetchUserOrders]);
 
   return (
     <Box className="min-h-screen bg-gray-50 p-8 mt-20">
@@ -38,7 +34,15 @@ export default function OrderPage() {
           My Orders
         </Typography>
 
-        {orders.length === 0 ? (
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 10 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Typography align="center" color="error">
+            {error}
+          </Typography>
+        ) : orders.length === 0 ? (
           <Typography align="center" color="text.secondary">
             You have no orders yet.
           </Typography>
@@ -58,12 +62,16 @@ export default function OrderPage() {
                     <TableCell sx={{ fontWeight: "bold" }}>Order ID</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Date</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Address</TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Product Details</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      Product Details
+                    </TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Qty</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Size</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Price</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
-                    <TableCell sx={{ fontWeight: "bold", textAlign: "right" }}>
+                    <TableCell
+                      sx={{ fontWeight: "bold", textAlign: "right" }}
+                    >
                       Total
                     </TableCell>
                   </TableRow>
@@ -71,47 +79,49 @@ export default function OrderPage() {
 
                 <TableBody>
                   {orders.map((order) =>
-                    order.products.map((product, idx) => (
-                      <TableRow key={`${order.id}-${idx}`} hover>
-                        {idx === 0 ? (
+                    order.items.map((product, idx) => (
+                      <TableRow key={`${order._id}-${idx}`} hover>
+                        {idx === 0 && (
                           <>
-                            <TableCell rowSpan={order.products.length}>
-                              {order.id}
+                            <TableCell rowSpan={order.items.length}>
+                              {order.customOrderId }
                             </TableCell>
-                            <TableCell rowSpan={order.products.length}>
-                              {order.date}
+                            <TableCell rowSpan={order.items.length}>
+                              {new Date(order.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell
-                              rowSpan={order.products.length}
+                              rowSpan={order.items.length}
                               sx={{ whiteSpace: "pre-wrap" }}
                             >
-                              {order.address}
+                              {order.shippingAddress
+                                ? `${order.shippingAddress.line1}, ${order.shippingAddress.city}`
+                                : "N/A"}
                             </TableCell>
                           </>
-                        ) : null}
+                        )}
 
                         <TableCell>{product.name}</TableCell>
-                        <TableCell>{product.qty}</TableCell>
-                        <TableCell>{product.size}</TableCell>
+                        <TableCell>{product.quantity}</TableCell>
+                        <TableCell>{product.size || "-"}</TableCell>
                         <TableCell>₹{product.price}</TableCell>
 
-                        {idx === 0 ? (
+                        {idx === 0 && (
                           <>
-                            <TableCell rowSpan={order.products.length}>
+                            <TableCell rowSpan={order.items.length}>
                               <Chip
                                 label={order.status}
                                 size="small"
                                 sx={{
                                   backgroundColor:
-                                    order.status === "Delivered"
+                                    order.status === "delivered"
                                       ? "#e8f5e9"
-                                      : order.status === "Pending"
+                                      : order.status === "pending"
                                       ? "#fff8e1"
                                       : "#ffebee",
                                   color:
-                                    order.status === "Delivered"
+                                    order.status === "delivered"
                                       ? "#2e7d32"
-                                      : order.status === "Pending"
+                                      : order.status === "pending"
                                       ? "#f9a825"
                                       : "#c62828",
                                   fontWeight: "bold",
@@ -119,20 +129,19 @@ export default function OrderPage() {
                               />
                             </TableCell>
                             <TableCell
-                              rowSpan={order.products.length}
+                              rowSpan={order.items.length}
                               sx={{ textAlign: "right", fontWeight: "bold" }}
                             >
-                              ₹{order.total}
+                              ₹{order.totalPrice}
                             </TableCell>
                           </>
-                        ) : null}
+                        )}
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
             </TableContainer>
-
             <Divider />
           </Paper>
         )}

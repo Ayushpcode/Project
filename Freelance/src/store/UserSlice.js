@@ -7,6 +7,7 @@ export const useUserStore = create(
   persist(
     (set, get) => ({
       user: null,
+      orders: [],
       customers: [],
       token: null,
       isAuthenticated: false,
@@ -15,7 +16,7 @@ export const useUserStore = create(
       addresses: [], // all saved addresses
       shippingAddresses: [], // array of shipping addresses
       selectedShippingAddressId: null, // selected address for checkout
-      
+
       selectedAddress: null, // ✅ new state
       setSelectedAddress: (address) => set({ selectedAddress: address }), // ✅ setter
 
@@ -213,33 +214,108 @@ export const useUserStore = create(
         }
       },
 
-    placeCODOrder: async () => {
-  const { token, selectedAddress } = get();
+      placeCODOrder: async () => {
+        const { token, selectedAddress } = get();
 
-  if (!selectedAddress) {
-    throw new Error("No address selected"); // ✅ Safety check
-  }
+        if (!selectedAddress) {
+          throw new Error("No address selected"); // ✅ Safety check
+        }
 
-  console.log("📦 Placing COD order with address:", selectedAddress);
+        console.log("📦 Placing COD order with address:", selectedAddress);
 
-  const res = await fetch(`${API_BASE}order/cod`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      paymentMode: "COD",
-      address: selectedAddress,
-       // ✅ sending full address object
-    }),
-  });
+        const res = await fetch(`${API_BASE}order/cod`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            paymentMode: "COD",
+            address: selectedAddress,
+            // ✅ sending full address object
+          }),
+        });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to place COD order");
-  return data;
-},
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.message || "Failed to place COD order");
+        return data;
+      },
 
+      // 🟢 Create Razorpay Order
+      createRazorpayOrder: async (amount) => {
+        const { token } = get();
+        try {
+          set({ loading: true, error: null });
+
+          const res = await fetch(`${API_BASE}payment/create-order`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ amount }),
+          });
+
+          const data = await res.json();
+          if (!res.ok)
+            throw new Error(data.message || "Failed to create Razorpay order");
+
+          console.log("✅ Razorpay Order Created:", data);
+          return data;
+        } catch (err) {
+          console.error("❌ Razorpay Order Error:", err);
+          set({ error: err.message });
+          throw err;
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      initiateRazorpayPayment: async (amount) => {
+        try {
+          const orderData = await get().createRazorpayOrder(amount);
+
+          const options = {
+            key: "rzp_test_xxxxxxxxx", // ⚡ Replace with your test key_id
+            amount: orderData.amount,
+            currency: orderData.currency,
+            name: "My Store",
+            description: "Order Payment",
+            order_id: orderData.id,
+            handler: async function (response) {
+              console.log("✅ Payment Success:", response);
+
+              const verifyRes = await fetch(
+                `${API_BASE}payment/verify-payment`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${get().token}`,
+                  },
+                  body: JSON.stringify(response),
+                }
+              );
+
+              const data = await verifyRes.json();
+              if (!verifyRes.ok)
+                throw new Error(data.message || "Payment verification failed");
+
+              alert("✅ Payment successful and verified!");
+            },
+            theme: {
+              color: "#000", // classic black look
+            },
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        } catch (err) {
+          console.error("❌ Payment Error:", err);
+          alert("Payment failed: " + err.message);
+        }
+      },
 
       fetchUsers: async () => {
         try {
@@ -267,6 +343,32 @@ export const useUserStore = create(
         } finally {
           set({ loading: false });
         }
+      },
+
+      fetchUserOrders: async () => {
+        try {
+          set({ loading: true, error: null });
+
+          const res = await fetch(`${API_BASE}order/my-orders`, {
+            method: "GET",
+            credentials: "include", 
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.message || "Failed to fetch orders");
+          }
+
+          const data = await res.json();
+
+         set({ orders: data.orders }); // ya data directly, depends on your API response
+    console.log("✅ Orders fetched:", data);
+  } catch (error) {
+    console.error("❌ Error fetching orders:", error);
+  }
       },
     }),
     {

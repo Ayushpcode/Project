@@ -4,41 +4,41 @@ const Product = require("../models/productModel");
 // ✅ Add to Cart
 const addToCart = async (req, res) => {
   try {
-    const { productId, quantity, size } = req.body; // 👈 size bhi le rahe hain
+    const { productId, quantity, size } = req.body;
     const userId = req.user.id;
 
-    // ✅ Product exist check
     const product = await Product.findById(productId);
     if (!product) {
+      console.log("❌ Product not found");
       return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    // ✅ User ka cart check karo
     let cart = await Cart.findOne({ userId });
-
     if (!cart) {
-      // Cart create karo
-      cart = new Cart({
-        userId,
-        products: [{ productId, quantity, size }],
-      });
-    } else {
-      // Check karo product same size ke sath pehle se hai kya
-      const existingProduct = cart.products.find(
-        (p) =>
-          p.productId.toString() === productId &&
-          (!size || p.size === size) // 👈 same size ka check
-      );
-
-      if (existingProduct) {
-        existingProduct.quantity += quantity; // quantity badha do
-      } else {
-        // naya variant add karo
-        cart.products.push({ productId, quantity, size });
-      }
+      cart = new Cart({ userId, products: [] });
     }
 
+    const existingProduct = cart.products.find(
+      (p) => p.productId.toString() === productId && p.size === size
+    );
+
+    if (existingProduct) {
+      console.log("🟡 Product already in cart with same size. Increasing quantity.");
+      existingProduct.quantity += quantity;
+    } else {
+      console.log("🆕 New product or size variant added to cart.");
+      cart.products.push({ productId, quantity, size });
+    }
+
+    // ✅ Recalculate total
+    const populatedCart = await cart.populate("products.productId");
+    cart.totalPrice = populatedCart.products.reduce((sum, item) => {
+      const price = item.productId?.price || 0;
+      return sum + price * item.quantity;
+    }, 0);
+
     await cart.save();
+
     return res.status(200).json({ success: true, cart });
   } catch (error) {
     console.error("❌ Add to Cart Error:", error.message);
@@ -47,20 +47,46 @@ const addToCart = async (req, res) => {
 };
 
 
+
+
 // ✅ Get Cart
 const getCart = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const cart = await Cart.findOne({ userId }).populate("products.productId");
-    if (!cart) return res.status(200).json({ success: true, cart: { products: [] } });
+    const cart = await Cart.findOne({ userId }).populate({
+      path: "products.productId",
+      select: "name price image brand sizes category subcategory",
+    });
 
-    res.status(200).json({ success: true, cart });
+    if (!cart) {
+      return res.status(200).json({ success: true, cart: { products: [] } });
+    }
+
+    cart.products.forEach((p) => {
+      console.log(`➡️ ${p.productId?.name} | Size: ${p.size} | Qty: ${p.quantity}`);
+    });
+
+    res.status(200).json({
+      success: true,
+      cart: {
+        _id: cart._id,
+        userId: cart.userId,
+        totalPrice: cart.totalPrice,
+        products: cart.products.map((p) => ({
+          _id: p._id,
+          productId: p.productId,
+          quantity: p.quantity,
+          size: p.size, 
+        })),
+      },
+    });
   } catch (error) {
-    console.error("Get Cart error:", error.message);
+    console.error("❌ Get Cart Error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 
 // ✅ Remove Product from Cart
 const removeFromCart = async (req, res) => {

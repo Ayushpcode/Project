@@ -22,6 +22,7 @@ const userRoutes = require("./routes/userRoutes");
 const productRoutes = require("./routes/productRoutes")
 const cartRoutes = require("./routes/cartRoutes")
 const orderRoutes = require("./routes/orderRoutes")
+const paymentRoutes = require("./routes/paymentRoutes")
 
 // Use routes
 app.use("/api/users", userRoutes);
@@ -29,6 +30,7 @@ app.use("/api/product", productRoutes);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/cart", cartRoutes);
 app.use("/api/order", orderRoutes);
+app.use("/api/payment", paymentRoutes);
 
 
 const PORT = process.env.PORT || 5000;

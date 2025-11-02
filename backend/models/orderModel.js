@@ -5,6 +5,7 @@ const orderItemSchema = new mongoose.Schema({
   name: { type: String, required: true },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true },
+  size: { type: String, required: false },
   image: { type: String },
 });
 
@@ -23,6 +24,7 @@ const shippingAddressSchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    customOrderId: { type: String, unique: true },
     items: [orderItemSchema],
     shippingAddress: shippingAddressSchema,
     totalPrice: { type: Number, required: true },
@@ -44,6 +46,14 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderSchema.pre("save", async function (next) {
+  if (!this.customOrderId) {
+    const random = Math.floor(1000 + Math.random() * 9000); // e.g., 4-digit random
+    this.customOrderId = `ORD-${Date.now().toString().slice(-6)}-${random}`;
+  }
+  next();
+});
 
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;

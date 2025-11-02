@@ -56,7 +56,8 @@ export default function UrbanMonkeyHeader() {
     selectedShippingAddressId,
     saveShippingAddress,
     placeCODOrder,
-    setSelectedAddress
+    setSelectedAddress,
+    initiateRazorpayPayment
   } = useUserStore();
 
   const { cartItems = [], fetchCart, updateCart, removeFromCart, clearCart } = useCartStore();
@@ -388,7 +389,7 @@ export default function UrbanMonkeyHeader() {
                   anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
                 >
 
-                   <MenuItem
+                  <MenuItem
                     onClick={() => {
                       navigate("/");
                       setProfileAnchor(null);
@@ -473,7 +474,7 @@ export default function UrbanMonkeyHeader() {
               ) : (
                 <List>
                   {cartItems.map((item, index) => (
-                    <React.Fragment key={item.productId?._id || item.productId || index}>
+                    <React.Fragment key={`${item.productId?._id || item.productId}-${item.size || index}`}>
                       <ListItem>
                         <img
                           src={item.productId?.image || ""}
@@ -494,7 +495,7 @@ export default function UrbanMonkeyHeader() {
                                 color="text.secondary"
                                 sx={{ fontSize: 13 }}
                               >
-                                Size: <strong>{item.productId?.size || "N/A"}</strong>
+                                Size: <strong>{item.size || "N/A"}</strong>
                               </Typography>
                             </>
                           }
@@ -783,11 +784,15 @@ export default function UrbanMonkeyHeader() {
                     Cash Payment
                   </Button>
 
+
                   <Button
                     variant={newAddress.paymentMethod === "online" ? "contained" : "outlined"}
                     fullWidth
                     color="success"
-                    onClick={() => setNewAddress({ ...newAddress, paymentMethod: "online" })}
+                    onClick={() => {
+                      setNewAddress({ ...newAddress, paymentMethod: "online" });
+                      initiateRazorpayPayment(finalAmount); // 💰 pass total amount from your cart/order
+                    }}
                     sx={{ py: 1.5, fontWeight: 600 }}
                   >
                     Online Payment
