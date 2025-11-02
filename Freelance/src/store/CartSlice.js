@@ -28,14 +28,14 @@ const useCartStore = create(
       },
 
       // ✅ Add to cart
-      addToCart: async (productId, quantity = 1) => {
+      addToCart: async (productId, quantity = 1, size) => {
         set({ loading: true, error: null })
         try {
           const res = await fetch(`${API_BASE}/cart/addToCart`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, quantity }),
+            body: JSON.stringify({ productId, quantity, size }),
           })
           const data = await res.json()
           if (!res.ok) throw new Error(data.message || "Failed to add to cart")

@@ -466,19 +466,53 @@ export default function UrbanMonkeyHeader() {
                   {cartItems.map((item, index) => (
                     <React.Fragment key={item.productId?._id || item.productId || index}>
                       <ListItem>
-                        <img src={item.productId.images?.[0]} alt={item.productId.name}
-                          style={{ width: 60, height: 60, marginRight: 12 }} />
-                        <ListItemText primary={item.productId.name} secondary={`₹${item.productId.price}`} />
+                        <img
+                          src={item.productId.images?.[0]}
+                          alt={item.productId.name}
+                          style={{ width: 60, height: 60, marginRight: 12, borderRadius: 8 }}
+                        />
+                        <ListItemText
+                          primary={item.productId.name}
+                          secondary={
+                            <>
+                              <Typography component="span" variant="body2" color="text.primary">
+                                ₹{item.productId.price}
+                              </Typography>
+                              <br />
+                              <Typography
+                                component="span"
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ fontSize: 13 }}
+                              >
+                                Size: <strong>{item.productId.size || "N/A"}</strong>
+                              </Typography>
+                            </>
+                          }
+                        />
                         <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                          <IconButton onClick={() => updateQuantity(item.productId._id, item.quantity - 1)}><RemoveIcon /></IconButton>
+                          <IconButton
+                            onClick={() =>
+                              updateQuantity(item.productId._id, item.quantity - 1)
+                            }
+                          >
+                            <RemoveIcon />
+                          </IconButton>
                           <Typography>{item.quantity}</Typography>
-                          <IconButton onClick={() => updateQuantity(item.productId._id, item.quantity + 1)}><AddIcon /></IconButton>
+                          <IconButton
+                            onClick={() =>
+                              updateQuantity(item.productId._id, item.quantity + 1)
+                            }
+                          >
+                            <AddIcon />
+                          </IconButton>
                         </Box>
                       </ListItem>
                       <Divider />
                     </React.Fragment>
                   ))}
                 </List>
+
               )
             )}
 
@@ -489,34 +523,34 @@ export default function UrbanMonkeyHeader() {
                 {shippingAddresses.length === 0 ? (
                   <Typography align="center" color="text.secondary">No saved addresses found.</Typography>
                 ) : (
-                                  shippingAddresses.map((addr, index) => {
-                      const addrId = addr._id || addr.id || index; // fallback id
-                      const isSelected = selectedShippingAddressId === addrId;
+                  shippingAddresses.map((addr, index) => {
+                    const addrId = addr._id || addr.id || index; // fallback id
+                    const isSelected = selectedShippingAddressId === addrId;
 
-                      return (
-                        <Box
-                          key={addrId} // ✅ ensure always unique key
-                          onClick={() => handleSelectAddress(addr)}
-                          sx={{
-                            borderRadius: 3,
-                            border: isSelected ? "2px solid black" : "1px solid #ddd",
-                            p: 2,
-                            cursor: "pointer",
-                            transition: "0.2s",
-                            "&:hover": { borderColor: "black" },
-                          }}
-                        >
-                          <Typography variant="subtitle1">{addr.fullName}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {addr.line1}, {addr.city}, {addr.state} - {addr.postalCode}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            📞 {addr.phoneNumber}
-                          </Typography>
-                          {isSelected && <Typography variant="caption" color="green">✓ Selected</Typography>}
-                        </Box>
-                      );
-                    })
+                    return (
+                      <Box
+                        key={addrId} // ✅ ensure always unique key
+                        onClick={() => handleSelectAddress(addr)}
+                        sx={{
+                          borderRadius: 3,
+                          border: isSelected ? "2px solid black" : "1px solid #ddd",
+                          p: 2,
+                          cursor: "pointer",
+                          transition: "0.2s",
+                          "&:hover": { borderColor: "black" },
+                        }}
+                      >
+                        <Typography variant="subtitle1">{addr.fullName}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {addr.line1}, {addr.city}, {addr.state} - {addr.postalCode}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          📞 {addr.phoneNumber}
+                        </Typography>
+                        {isSelected && <Typography variant="caption" color="green">✓ Selected</Typography>}
+                      </Box>
+                    );
+                  })
                 )}
               </Box>
             )}
@@ -695,10 +729,10 @@ export default function UrbanMonkeyHeader() {
                           return;
                         }
 
-                        if ({...newAddress.paymentMethod === "cod"}) {
-                          await placeCODOrder({ items: cartItems, address: selectedAddr , });
+                        if ({ ...newAddress.paymentMethod === "cod" }) {
+                          await placeCODOrder({ items: cartItems, address: selectedAddr, });
                           alert("✅ COD Order placed successfully!");
-                          setIsCartOpen(false); 
+                          setIsCartOpen(false);
                         } else if (newAddress.paymentMethod === "online") {
                           console.log("💳 Redirecting to online payment...");
                         } else {

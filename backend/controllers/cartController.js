@@ -4,43 +4,48 @@ const Product = require("../models/productModel");
 // ✅ Add to Cart
 const addToCart = async (req, res) => {
   try {
-    console.log("first")
-    const { productId, quantity } = req.body;
-    const userId = req.user.id; // 👈 JWT middleware se aa raha hoga
+    const { productId, quantity, size } = req.body; // 👈 size bhi le rahe hain
+    const userId = req.user.id;
 
-    // Check if product exists
+    // ✅ Product exist check
     const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
 
-    // User ka cart check karo
+    // ✅ User ka cart check karo
     let cart = await Cart.findOne({ userId });
 
     if (!cart) {
-      console.log("Cart Not present")
       // Cart create karo
       cart = new Cart({
         userId,
-        products: [{ productId, quantity }],
+        products: [{ productId, quantity, size }],
       });
     } else {
-      console.log("Already cart hai")
-      // Already cart hai → product check karo
-      const existingProduct = cart.products.find((p) => p.productId.toString() === productId);
+      // Check karo product same size ke sath pehle se hai kya
+      const existingProduct = cart.products.find(
+        (p) =>
+          p.productId.toString() === productId &&
+          (!size || p.size === size) // 👈 same size ka check
+      );
 
       if (existingProduct) {
-        existingProduct.quantity += quantity; // increase quantity
+        existingProduct.quantity += quantity; // quantity badha do
       } else {
-        cart.products.push({ productId, quantity });
+        // naya variant add karo
+        cart.products.push({ productId, quantity, size });
       }
     }
 
     await cart.save();
-    res.status(200).json({ success: true, cart });
+    return res.status(200).json({ success: true, cart });
   } catch (error) {
-    console.error("Add to Cart error:", error.message);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Add to Cart Error:", error.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 
 // ✅ Get Cart
 const getCart = async (req, res) => {

@@ -18,8 +18,8 @@ export default function ProductDetailPage() {
   const handleAddToCart = async (e) => {
     e.stopPropagation()
     try {
-      await addToCart(product._id, 1)
-      alert(`✅ ${product.name} added to cart!`)
+      await addToCart(product._id, 1, selectedSize?.size)
+      alert(`✅ ${product.name} (Size: ${selectedSize?.size || "N/A"}) added to cart!`)
     } catch {
       alert(`❌ ${error || "Failed to add product"}`)
     }
