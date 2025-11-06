@@ -23,6 +23,7 @@ const productRoutes = require("./routes/productRoutes")
 const cartRoutes = require("./routes/cartRoutes")
 const orderRoutes = require("./routes/orderRoutes")
 const paymentRoutes = require("./routes/paymentRoutes");
+const coustomerRoutes = require("./routes/coustomerRoutes");
 const { getDashboardStats } = require("./controllers/dashboardController");
 
 // Use routes
@@ -33,6 +34,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/order", orderRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/dash", getDashboardStats);
+app.use("/api/admin", coustomerRoutes);
 
 
 const PORT = process.env.PORT || 5000;

@@ -37,61 +37,87 @@ export function ProductManagement() {
     };
   }, [preview]);
 
-  const handleAddProduct = async () => {
-    if (
-      !formData.name?.trim() ||
-      !formData.price ||
-      !formData.category?.trim() ||
-      !formData.subcategory?.trim() ||
-      !formData.brand?.trim() ||
-      !formData.description?.trim() ||
-      !formData.sizes ||
-      formData.sizes.length === 0 ||
-      formData.sizes.some((s) => !s.size?.trim() || s.stock === undefined)
-    ) {
-      toast.error("Please fill all required fields and sizes with stock");
-      return;
+ const handleAddProduct = async () => {
+  if (
+    !formData.name?.trim() ||
+    !formData.price ||
+    !formData.category?.trim() ||
+    !formData.subcategory?.trim() ||
+    !formData.brand?.trim() ||
+    !formData.description?.trim() ||
+    !formData.sizes ||
+    formData.sizes.length === 0 ||
+    formData.sizes.some((s) => !s.size?.trim() || s.stock === undefined)
+  ) {
+    toast.error("Please fill all required fields and sizes with stock");
+    return;
+  }
+
+  try {
+    const totalStock = formData.sizes.reduce((acc, s) => acc + Number(s.stock || 0), 0);
+    const status = totalStock === 0 ? "Out of Stock" : totalStock <= 10 ? "Limited" : "Active";
+
+    // ✅ Use FormData for file uploads
+    const productData = new FormData();
+    productData.append('name', formData.name.trim());
+    productData.append('price', formData.price);
+    productData.append('category', formData.category.trim().toLowerCase());
+    productData.append('subcategory', formData.subcategory.trim());
+    productData.append('brand', formData.brand.trim());
+    productData.append('description', formData.description.trim());
+    productData.append('status', status);
+    
+    // Append sizes as JSON string
+    productData.append('sizes', JSON.stringify(
+      formData.sizes.map(s => ({
+        size: s.size,
+        stock: Number(s.stock)
+      }))
+    ));
+
+  if (formData.image instanceof File) {
+    // New file upload
+    productData.append('image', formData.image);
+  } else if (typeof formData.image === 'string' && formData.image.trim()) {
+    // Existing URL (for edit) - send as regular field
+    productData.append('image', formData.image);
+  }
+
+    
+
+    console.log('📤 Sending product data');
+
+    if (editingId) {
+      await updateProduct(editingId, productData);
+    } else {
+      await addProduct(productData);
     }
 
-    try {
-      const totalStock = formData.sizes.reduce((acc, s) => acc + Number(s.stock || 0), 0);
-      const status = totalStock === 0 ? "Out of Stock" : totalStock <= 10 ? "Limited" : "Active";
+    toast.success(editingId ? "Product updated!" : "Product added!");
 
-      const data = new FormData();
-      data.append("name", formData.name.trim());
-      data.append("price", formData.price);
-      data.append("category", formData.category.trim().toLowerCase());
-      data.append("subcategory", formData.subcategory.trim());
-      data.append("brand", formData.brand.trim());
-      data.append("description", formData.description.trim());
-      data.append("sizes", JSON.stringify(formData.sizes));
-      data.append("status", status);
-      if (formData.image instanceof File) data.append("image", formData.image);
-
-      if (editingId) await updateProduct(editingId, data);
-      else await addProduct(data);
-
-      toast.success(editingId ? "Product updated!" : "Product added!");
-
-      setFormData({
-        name: "",
-        price: "",
-        category: "Jersey",
-        subcategory: "",
-        brand: "",
-        description: "",
-        image: "",
-        sizes: [],
-        status: "Active",
-      });
-      setPreview(null);
-      setShowForm(false);
-      setEditingId(null);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to save product");
-    }
-  };
+    // Reset form
+    setFormData({
+      name: "",
+      price: "",
+      category: "Jersey",
+      subcategory: "",
+      brand: "",
+      description: "",
+      image: "",
+      sizes: [],
+      status: "Active",
+    });
+    setPreview(null);
+    setShowForm(false);
+    setEditingId(null);
+    
+    await fetchProducts();
+    
+  } catch (err) {
+    console.error('Error saving product:', err);
+    toast.error(err.message || "Failed to save product");
+  }
+};
 
   const handleEdit = (product) => {
     setFormData({
@@ -350,9 +376,9 @@ export function ProductManagement() {
       {/* Product List */}
       <div className="grid gap-4 mt-6">
         {filteredProducts.length > 0 ? (
-          filteredProducts.map((product) => (
+          filteredProducts.map((product, index) => (
             <div
-              key={product._id}
+              key={`${product._id}-${index}`} 
               className="p-4 border rounded-xl flex justify-between items-center gap-4 hover:shadow-md transition"
             >
               {product.image && (
