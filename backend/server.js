@@ -2,6 +2,7 @@ const dotenv = require("dotenv");
 dotenv.config(); // ✅ Load env before everything
 
 const express = require("express");
+const Razorpay = require('razorpay');
 const cors = require("cors");
 const connectDB = require("./config/db");
 const cookieParser = require("cookie-parser");

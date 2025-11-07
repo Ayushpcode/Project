@@ -748,31 +748,34 @@ export default function UrbanMonkeyHeader() {
                       fullWidth
                       color="success"
                       sx={{ py: 1.5, fontWeight: 600 }}
-                      onClick={async () => {
-                        try {
-                          const { cartItems } = useCartStore.getState();
-                          const { placeCODOrder, selectedShippingAddressId, shippingAddresses } = useUserStore.getState();
+                      // onClick={async () => {
+                      //   try {
+                      //     const { cartItems } = useCartStore.getState();
+                      //     const { placeCODOrder, selectedShippingAddressId, shippingAddresses } = useUserStore.getState();
 
-                          // find the selected address object
-                          const selectedAddr = shippingAddresses.find(a => a.id === selectedShippingAddressId);
-                          if (!selectedAddr) {
-                            alert("Please select a shipping address");
-                            return;
-                          }
+                      //     // find the selected address object
+                      //     const selectedAddr = shippingAddresses.find(a => a.id === selectedShippingAddressId);
+                      //     if (!selectedAddr) {
+                      //       alert("Please select a shipping address");
+                      //       return;
+                      //     }
 
-                          if (newAddress.paymentMethod === "cod") {
-                            await placeCODOrder({ items: cartItems, address: selectedAddr });
-                            alert("✅ COD Order placed successfully!");
-                            setIsCartOpen(false);
-                          } else if (newAddress.paymentMethod === "online") {
-                            console.log("💳 Redirecting to online payment...");
-                          } else {
-                            alert("Please select a payment method first!");
-                          }
-                        } catch (err) {
-                          console.error("❌ Order failed:", err);
-                        }
-                      }}
+                      //     if (newAddress.paymentMethod === "cod") {
+                      //       await placeCODOrder({ items: cartItems, address: selectedAddr });
+                      //       alert("✅ COD Order placed successfully!");
+                      //       setIsCartOpen(false);
+                      //     } else if (newAddress.paymentMethod === "online") {
+                      //       console.log("💳 Redirecting to online payment...");
+                      //     } else {
+                      //       alert("Please select a payment method first!");
+                      //     }
+                      //   } catch (err) {
+                      //     console.error("❌ Order failed:", err);
+                      //   }
+                      // }}
+                      onClick={() =>
+                        setNewAddress({ ...newAddress, paymentMethod: "cod" })
+                      }
                     >
                       Cash Payment
                     </Button>
@@ -781,10 +784,13 @@ export default function UrbanMonkeyHeader() {
                       variant={newAddress.paymentMethod === "online" ? "contained" : "outlined"}
                       fullWidth
                       color="success"
-                      onClick={() => {
-                        setNewAddress({ ...newAddress, paymentMethod: "online" });
-                        initiateRazorpayPayment(finalAmount);
-                      }}
+                      // onClick={() => {
+                      //   setNewAddress({ ...newAddress, paymentMethod: "online" });
+                      //   initiateRazorpayPayment(finalAmount);
+                      // }}
+                      onClick={() =>
+                        setNewAddress({ ...newAddress, paymentMethod: "online" })
+                      }
                       sx={{ py: 1.5, fontWeight: 600 }}
                     >
                       Online Payment
@@ -808,7 +814,45 @@ export default function UrbanMonkeyHeader() {
             {cartStep === "address" &&
               <Button fullWidth variant="contained" sx={{ bgcolor: "black", "&:hover": { bgcolor: "#333" }, py: 1.2, fontWeight: "bold" }} onClick={handleSaveNewAddress}>Save Address</Button>}
             {cartStep === "payment" &&
-              <Button fullWidth variant="contained" sx={{ bgcolor: "black", "&:hover": { bgcolor: "#333" }, py: 1.5, fontWeight: "bold" }} onClick={handleNext}>Place Order</Button>}
+              <Button
+                fullWidth variant="contained"
+                sx={{ bgcolor: "black", "&:hover": { bgcolor: "#333" }, py: 1.5, fontWeight: "bold" }}
+                onClick={async () => {
+                  try {
+                    const { cartItems } = useCartStore.getState();
+                    const {
+                      placeCODOrder,
+                      selectedShippingAddressId,
+                      shippingAddresses,
+                    } = useUserStore.getState();
+
+                    const selectedAddr = shippingAddresses.find(
+                      (a) => a.id === selectedShippingAddressId
+                    );
+
+                    if (!selectedAddr) {
+                      alert("Please select a shipping address");
+                      return;
+                    }
+
+                    // ✅ Handle payment type
+                    if (newAddress.paymentMethod === "cod") {
+                      await placeCODOrder({ items: cartItems, address: selectedAddr });
+                      alert("✅ COD Order placed successfully!");
+                      setIsCartOpen(false);
+                    } else if (newAddress.paymentMethod === "online") {
+                      initiateRazorpayPayment(finalAmount);
+                    } else {
+                      alert("Please select a payment method first!");
+                    }
+                  } catch (err) {
+                    console.error("❌ Order failed:", err);
+                  }
+                }}
+              >
+
+                Place Order
+              </Button>}
           </Box>
         </Box>
       </Drawer>

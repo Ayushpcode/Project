@@ -15,6 +15,11 @@ export function ProductManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const formRef = useRef(null);
 
+  // ✅ Dynamic Categories
+  const [categories, setCategories] = useState(["Jersey", "Boots"]);
+  const [showCategoryInput, setShowCategoryInput] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -37,87 +42,91 @@ export function ProductManagement() {
     };
   }, [preview]);
 
- const handleAddProduct = async () => {
-  if (
-    !formData.name?.trim() ||
-    !formData.price ||
-    !formData.category?.trim() ||
-    !formData.subcategory?.trim() ||
-    !formData.brand?.trim() ||
-    !formData.description?.trim() ||
-    !formData.sizes ||
-    formData.sizes.length === 0 ||
-    formData.sizes.some((s) => !s.size?.trim() || s.stock === undefined)
-  ) {
-    toast.error("Please fill all required fields and sizes with stock");
-    return;
-  }
+  // ✅ Add new category
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      setCategories([...categories, newCategory.trim()]);
+      setFormData({ ...formData, category: newCategory.trim() });
+      setNewCategory("");
+      setShowCategoryInput(false);
+      toast.success("Category added!");
+    }
+  };
 
-  try {
-    const totalStock = formData.sizes.reduce((acc, s) => acc + Number(s.stock || 0), 0);
-    const status = totalStock === 0 ? "Out of Stock" : totalStock <= 10 ? "Limited" : "Active";
-
-    // ✅ Use FormData for file uploads
-    const productData = new FormData();
-    productData.append('name', formData.name.trim());
-    productData.append('price', formData.price);
-    productData.append('category', formData.category.trim().toLowerCase());
-    productData.append('subcategory', formData.subcategory.trim());
-    productData.append('brand', formData.brand.trim());
-    productData.append('description', formData.description.trim());
-    productData.append('status', status);
-    
-    // Append sizes as JSON string
-    productData.append('sizes', JSON.stringify(
-      formData.sizes.map(s => ({
-        size: s.size,
-        stock: Number(s.stock)
-      }))
-    ));
-
-  if (formData.image instanceof File) {
-    // New file upload
-    productData.append('image', formData.image);
-  } else if (typeof formData.image === 'string' && formData.image.trim()) {
-    // Existing URL (for edit) - send as regular field
-    productData.append('image', formData.image);
-  }
-
-    
-
-    console.log('📤 Sending product data');
-
-    if (editingId) {
-      await updateProduct(editingId, productData);
-    } else {
-      await addProduct(productData);
+  const handleAddProduct = async () => {
+    if (
+      !formData.name?.trim() ||
+      !formData.price ||
+      !formData.category?.trim() ||
+      !formData.subcategory?.trim() ||
+      !formData.brand?.trim() ||
+      !formData.description?.trim() ||
+      !formData.sizes ||
+      formData.sizes.length === 0 ||
+      formData.sizes.some((s) => !s.size?.trim() || s.stock === undefined)
+    ) {
+      toast.error("Please fill all required fields and sizes with stock");
+      return;
     }
 
-    toast.success(editingId ? "Product updated!" : "Product added!");
+    try {
+      const totalStock = formData.sizes.reduce((acc, s) => acc + Number(s.stock || 0), 0);
+      const status = totalStock === 0 ? "Out of Stock" : totalStock <= 10 ? "Limited" : "Active";
 
-    // Reset form
-    setFormData({
-      name: "",
-      price: "",
-      category: "Jersey",
-      subcategory: "",
-      brand: "",
-      description: "",
-      image: "",
-      sizes: [],
-      status: "Active",
-    });
-    setPreview(null);
-    setShowForm(false);
-    setEditingId(null);
-    
-    await fetchProducts();
-    
-  } catch (err) {
-    console.error('Error saving product:', err);
-    toast.error(err.message || "Failed to save product");
-  }
-};
+      const productData = new FormData();
+      productData.append('name', formData.name.trim());
+      productData.append('price', formData.price);
+      productData.append('category', formData.category.trim().toLowerCase());
+      productData.append('subcategory', formData.subcategory.trim());
+      productData.append('brand', formData.brand.trim());
+      productData.append('description', formData.description.trim());
+      productData.append('status', status);
+      
+      productData.append('sizes', JSON.stringify(
+        formData.sizes.map(s => ({
+          size: s.size,
+          stock: Number(s.stock)
+        }))
+      ));
+
+      if (formData.image instanceof File) {
+        productData.append('image', formData.image);
+      } else if (typeof formData.image === 'string' && formData.image.trim()) {
+        productData.append('image', formData.image);
+      }
+
+      console.log('📤 Sending product data');
+
+      if (editingId) {
+        await updateProduct(editingId, productData);
+      } else {
+        await addProduct(productData);
+      }
+
+      toast.success(editingId ? "Product updated!" : "Product added!");
+
+      setFormData({
+        name: "",
+        price: "",
+        category: categories[0] || "Jersey",
+        subcategory: "",
+        brand: "",
+        description: "",
+        image: "",
+        sizes: [],
+        status: "Active",
+      });
+      setPreview(null);
+      setShowForm(false);
+      setEditingId(null);
+      
+      await fetchProducts();
+      
+    } catch (err) {
+      console.error('Error saving product:', err);
+      toast.error(err.message || "Failed to save product");
+    }
+  };
 
   const handleEdit = (product) => {
     setFormData({
@@ -160,7 +169,6 @@ export function ProductManagement() {
       sizes: [...formData.sizes, { id: Date.now() + Math.random(), size: "", stock: 0 }],
     });
 
-  // ✅ Filter products by search
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -189,7 +197,7 @@ export function ProductManagement() {
               setFormData({
                 name: "",
                 price: "",
-                category: "Jersey",
+                category: categories[0] || "Jersey",
                 subcategory: "",
                 brand: "",
                 description: "",
@@ -229,43 +237,127 @@ export function ProductManagement() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <input
-                placeholder="Product Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="border p-2 rounded-lg"
-              />
-              <input
-                placeholder="Price"
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="border p-2 rounded-lg"
-              />
-              <input
-                placeholder="Category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="border p-2 rounded-lg"
-              />
-              <input
-                placeholder="Subcategory"
-                value={formData.subcategory}
-                onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
-                className="border p-2 rounded-lg"
-              />
-              <input
-                placeholder="Brand"
-                value={formData.brand}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                className="border p-2 rounded-lg"
-              />
-              <input
-                placeholder="Description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="border p-2 rounded-lg"
-              />
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Product Name *
+                </label>
+                <input
+                  placeholder="e.g., Manchester United Jersey"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Price *
+                </label>
+                <input
+                  placeholder="e.g., 4999"
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              {/* ✅ Dynamic Category Dropdown */}
+              <div className="relative">
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Category *
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => {
+                    if (e.target.value === "__add_new__") {
+                      setShowCategoryInput(true);
+                    } else {
+                      setFormData({ ...formData, category: e.target.value });
+                    }
+                  }}
+                  className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                  {/* <option value="__add_new__">+ Add New Category</option> */}
+                </select>
+
+                {/* Add New Category Input */}
+                {showCategoryInput && (
+                  <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-white border rounded-lg shadow-lg z-10">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Enter new category"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") handleAddCategory();
+                        }}
+                        className="flex-1 border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleAddCategory}
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCategoryInput(false);
+                          setNewCategory("");
+                        }}
+                        className="px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Subcategory *
+                </label>
+                <input
+                  placeholder="e.g., Premier League"
+                  value={formData.subcategory}
+                  onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+                  className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Brand *
+                </label>
+                <input
+                  placeholder="e.g., Adidas"
+                  value={formData.brand}
+                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                />
+              </div>
+
+              {/* ✅ Description as Textarea - spans 2 columns */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Description *
+                </label>
+                <textarea
+                  placeholder="Enter product description..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={4}
+                  className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none resize-none"
+                />
+              </div>
             </div>
 
             {/* Image Upload */}
@@ -303,11 +395,11 @@ export function ProductManagement() {
 
             {/* Sizes */}
             <div className="mb-4">
-              <h4 className="font-semibold mb-2">Sizes & Stock</h4>
+              <h4 className="font-semibold mb-2">Sizes & Stock *</h4>
               {formData.sizes.map((s) => (
                 <div key={s.id} className="flex gap-2 mb-2">
                   <input
-                    placeholder="Size"
+                    placeholder="Size (e.g., S, M, L)"
                     value={s.size || ""}
                     onChange={(e) =>
                       setFormData({
@@ -340,7 +432,7 @@ export function ProductManagement() {
                         sizes: formData.sizes.filter((item) => item.id !== s.id),
                       })
                     }
-                    className="px-2 bg-red-500 text-white rounded"
+                    className="px-2 bg-red-500 text-white rounded hover:bg-red-600"
                   >
                     X
                   </button>
@@ -358,7 +450,7 @@ export function ProductManagement() {
               <button
                 onClick={handleAddProduct}
                 disabled={loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
                 {loading ? "Saving..." : "Save"}
               </button>
@@ -411,7 +503,7 @@ export function ProductManagement() {
               <div className="flex gap-4 items-center">
                 <div>
                   <p className="text-sm text-gray-500">Price</p>
-                  <p className="font-bold text-lg">${product.price}</p>
+                  <p className="font-bold text-lg">₹{product.price}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Sizes</p>

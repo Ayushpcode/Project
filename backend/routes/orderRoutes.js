@@ -8,7 +8,7 @@ router.post("/shippingAddress", authMiddleware(), saveShippingAddress);
 
 router.post("/cod", authMiddleware(), placeCODOrder);
 router.get("/my-orders", authMiddleware(), getAllUserOrders );
-router.get("/all-orders", authMiddleware(), getAllOrders );
-router.put("/status/:id", authMiddleware(), updateOrderStatus);
+router.get("/all-orders", authMiddleware("admin"), getAllOrders );
+router.put("/status/:id", authMiddleware("admin"), updateOrderStatus);
 
 module.exports = router;

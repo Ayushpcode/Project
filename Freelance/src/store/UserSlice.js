@@ -242,110 +242,139 @@ export const useUserStore = create(
         return data;
       },
 
-      // 🟢 Create Razorpay Order
-     // 🟢 Create Razorpay Order
-createRazorpayOrder: async (amount) => {
-  const { token } = get();
-  try {
-    set({ loading: true, error: null });
+      // ✅ FIXED Razorpay Implementation for UserStore
 
-    const res = await fetch(`${API_BASE}payment/create-order`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ amount }), // amount in rupees
-    });
-
-    const data = await res.json();
-    if (!res.ok)
-      throw new Error(data.message || "Failed to create Razorpay order");
-
-    console.log("✅ Razorpay Order Created:", data);
-    return data.order; // ✅ Return the order object from response
-  } catch (err) {
-    console.error("❌ Razorpay Order Error:", err);
-    set({ error: err.message });
-    throw err;
-  } finally {
-    set({ loading: false });
-  }
-},
-
-initiateRazorpayPayment: async (amount) => {
-  try {
-    const orderData = await get().createRazorpayOrder(amount);
-
-    const options = {
-      key: process.env.RAZORPAY_KEY_ID || "rzp_test_xxxxxxxxx", // ⚡ Replace with your test key_id
-      amount: orderData.amount,
-      currency: orderData.currency,
-      name: "URBAN MONKEY®",
-      description: "Order Payment",
-      order_id: orderData.id,
-      handler: async function (response) {
-        console.log("✅ Payment Success:", response);
-
+      createRazorpayOrder: async (amount) => {
+        const { token } = get();
         try {
-          const verifyRes = await fetch(
-            `${API_BASE}payment/verify-payment`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${get().token}`,
-              },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            }
-          );
+          set({ loading: true, error: null });
 
-          const data = await verifyRes.json();
-          if (!verifyRes.ok)
-            throw new Error(data.message || "Payment verification failed");
+          const res = await fetch(`${API_BASE}payment/create-order`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ amount }), // amount in rupees
+          });
 
-          alert("✅ Payment successful and verified!");
-          
-          // ✅ Clear cart after successful payment
-          const { clearCart } = useCartStore.getState();
-          if (clearCart) await clearCart();
-          
-          // ✅ Redirect to orders page or home
-          window.location.href = "/orders";
-          
-        } catch (verifyErr) {
-          console.error("❌ Verification Error:", verifyErr);
-          alert("Payment verification failed: " + verifyErr.message);
+          const data = await res.json();
+          if (!res.ok)
+            throw new Error(data.message || "Failed to create Razorpay order");
+
+          console.log("✅ Razorpay Order Created:", data);
+          return data.order; // ✅ Return the order object from response
+        } catch (err) {
+          console.error("❌ Razorpay Order Error:", err);
+          set({ error: err.message });
+          throw err;
+        } finally {
+          set({ loading: false });
         }
       },
-      prefill: {
-        name: get().user?.name || "",
-        email: get().user?.email || "",
-        contact: get().user?.phone || "",
-      },
-      theme: {
-        color: "#000000", // Black theme for Urban Monkey
-      },
-    };
 
-    const rzp = new window.Razorpay(options);
-    
-    rzp.on('payment.failed', function (response) {
-      console.error("❌ Payment Failed:", response.error);
-      alert(`Payment failed: ${response.error.description}`);
-    });
-    
-    rzp.open();
-  } catch (err) {
-    console.error("❌ Payment Error:", err);
-    alert("Payment failed: " + err.message);
-    throw err;
-  }
-},
+      initiateRazorpayPayment: async (amount) => {
+        try {
+          // ✅ Check if Razorpay is loaded
+          if (!window.Razorpay) {
+            throw new Error(
+              "Razorpay SDK not loaded. Please check your internet connection."
+            );
+          }
+
+          const orderData = await get().createRazorpayOrder(amount);
+
+          // ✅ Return a promise that resolves with success status
+          return new Promise((resolve, reject) => {
+            const options = {
+              // ✅ Import from config file
+              key: "rzp_test_xxxxxxxxx", // 🔴 REPLACE THIS WITH YOUR ACTUAL KEY
+              amount: orderData.amount,
+              currency: orderData.currency,
+              name: "URBAN MONKEY®",
+              description: "Order Payment",
+              order_id: orderData.id,
+              handler: async function (response) {
+                console.log("✅ Payment Success:", response);
+
+                try {
+                  const verifyRes = await fetch(
+                    `${API_BASE}payment/verify-payment`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${get().token}`,
+                      },
+                      body: JSON.stringify({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature,
+                      }),
+                    }
+                  );
+
+                  const data = await verifyRes.json();
+                  if (!verifyRes.ok)
+                    throw new Error(
+                      data.message || "Payment verification failed"
+                    );
+
+                  alert("✅ Payment successful and verified!");
+
+                  // ✅ Fetch cart instance properly
+                  const cartStore = await import("./CartSlice");
+                  const { clearCart } = cartStore.default.getState();
+                  if (clearCart) await clearCart();
+
+                  // ✅ Resolve promise with success
+                  resolve({
+                    success: true,
+                    paymentId: response.razorpay_payment_id,
+                  });
+
+                  // ✅ Redirect after a short delay
+                  setTimeout(() => {
+                    window.location.href = "/orders";
+                  }, 1500);
+                } catch (verifyErr) {
+                  console.error("❌ Verification Error:", verifyErr);
+                  alert("Payment verification failed: " + verifyErr.message);
+                  reject(verifyErr);
+                }
+              },
+              prefill: {
+                name: get().user?.name || "",
+                email: get().user?.email || "",
+                contact: get().user?.phone || "",
+              },
+              theme: {
+                color: "#000000", // Black theme for Urban Monkey
+              },
+              modal: {
+                ondismiss: function () {
+                  console.log("⚠️ Payment modal closed by user");
+                  reject(new Error("Payment cancelled by user"));
+                },
+              },
+            };
+
+            const rzp = new window.Razorpay(options);
+
+            rzp.on("payment.failed", function (response) {
+              console.error("❌ Payment Failed:", response.error);
+              alert(`Payment failed: ${response.error.description}`);
+              reject(new Error(response.error.description));
+            });
+
+            rzp.open();
+          });
+        } catch (err) {
+          console.error("❌ Payment Error:", err);
+          alert("Payment initiation failed: " + err.message);
+          throw err;
+        }
+      },
 
       fetchUsers: async () => {
         try {
@@ -453,7 +482,7 @@ initiateRazorpayPayment: async (amount) => {
           console.error("❌ Update status error:", error);
         }
       },
-            // 🟢 DASHBOARD SUMMARY (Admin Dashboard)
+      // 🟢 DASHBOARD SUMMARY (Admin Dashboard)
       dashboardStats: {
         totalProducts: 0,
         totalOrders: 0,
@@ -477,7 +506,9 @@ initiateRazorpayPayment: async (amount) => {
           const data = await res.json();
 
           if (!res.ok)
-            throw new Error(data.message || "Failed to fetch dashboard summary");
+            throw new Error(
+              data.message || "Failed to fetch dashboard summary"
+            );
 
           set({
             dashboardStats: {
@@ -496,7 +527,6 @@ initiateRazorpayPayment: async (amount) => {
           set({ error: err.message, loading: false });
         }
       },
-
     }),
     {
       name: "user-storage",

@@ -63,7 +63,7 @@ const Order = require("../models/orderModel");
         return res.status(400).json({ message: "Invalid or expired OTP" });
 
       if (!user.role) {
-        user.role = "user"; // default
+        user.role = "user"; 
       }
 
       // JWT generate

@@ -17,8 +17,8 @@ router.get("/getAllProduct", getAllProducts);
 router.get("/getProductById/:id", getProductById);
 router.get("/exists/:id", checkProductExists);
 
-router.post("/addProduct",authMiddleware(), upload.single("image"), addProduct);
-router.put("/updateProduct/:id", authMiddleware(), upload.single("image"), updateProduct);
-router.delete("/deleteProduct/:id", authMiddleware(), deleteProduct);
+router.post("/addProduct",authMiddleware("admin"), upload.single("image"), addProduct);
+router.put("/updateProduct/:id", authMiddleware("admin"), upload.single("image"), updateProduct);
+router.delete("/deleteProduct/:id", authMiddleware("admin"), deleteProduct);
 
 module.exports = router;
