@@ -31,7 +31,6 @@ const Order = require("../models/orderModel");
           `Your OTP is: ${otp}. It is valid for 5 minutes.`
         );
       } catch (emailError) {
-        console.error("Failed to send OTP email:", emailError.message);
         return res.status(500).json({
           success: false,
           message: "Failed to send OTP email",
@@ -41,10 +40,8 @@ const Order = require("../models/orderModel");
       return res.status(200).json({
         success: true,
         message: "OTP sent successfully to your email",
-        // otp, // ❌ only for testing, remove in production
       });
     } catch (error) {
-      console.error("Request OTP error:", error.message);
       res.status(500).json({ message: "Server error" });
     }
   };
@@ -91,7 +88,6 @@ const Order = require("../models/orderModel");
         token,
       });
     } catch (error) {
-      console.error("Verify OTP error:", error.message);
       res.status(500).json({ message: "Server error" });
     }
   };
@@ -117,7 +113,6 @@ const Order = require("../models/orderModel");
 
       return res.status(200).json({ message: "Logout successful" });
     } catch (error) {
-      console.error("Logout error:", error);
       return res.status(500).json({ message: "Server error" });
     }
   };
@@ -134,7 +129,6 @@ const Order = require("../models/orderModel");
       // addresses array return
       res.status(200).json({ addresses: user.addresses || [] });
     } catch (error) {
-      console.error(error);
       res.status(500).json({ message: "Server error" });
     }
   };
@@ -179,10 +173,50 @@ const getAllCustomersWithStats = async (req, res) => {
       customers,
     });
   } catch (error) {
-    console.error("❌ Error fetching customer data:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 
-  module.exports = { requestOTP, verifyOTP, logout, getAllUser, getUserAddresses ,getAllCustomersWithStats };
+const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Generate new OTP
+    const otp = generateOTP();
+    const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
+
+    // Send OTP via email
+    try {
+      await sendEmail(
+        email,
+        "Your OTP for Login",
+        `Your OTP is: ${otp}. It is valid for 5 minutes.`
+      );
+    } catch (emailError) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP resent successfully to your email",
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+  module.exports = { requestOTP, verifyOTP, logout, getAllUser, getUserAddresses ,getAllCustomersWithStats, resendOTP };

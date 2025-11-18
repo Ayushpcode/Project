@@ -23,7 +23,8 @@ export const useUserStore = create(
 
       selectShippingAddress: (id) => set({ selectedShippingAddressId: id }),
 
-      setShippingAddresses: (addresses) => set({ shippingAddresses: addresses }),
+      setShippingAddresses: (addresses) =>
+        set({ shippingAddresses: addresses }),
 
       requestOtp: async (email) => {
         set({ loading: true, error: null });
@@ -147,7 +148,10 @@ export const useUserStore = create(
           if (!res.ok)
             throw new Error(data.message || "Failed to fetch addresses");
 
-          set({ addresses: data.addresses });
+          set({
+            addresses: data.addresses,
+            shippingAddresses: data.addresses,
+          });
           return data.addresses;
         } catch (err) {
           set({ error: err.message });
@@ -215,6 +219,44 @@ export const useUserStore = create(
         if (!res.ok)
           throw new Error(data.message || "Failed to place COD order");
         return data;
+      },
+
+      checkWelcomeDiscount: async () => {
+        const { token } = get();
+        if (!token) {
+          return { isEligible: false, discountPercentage: 0 };
+        }
+
+        try {
+          // ✅ ADD: Cache buster with timestamp to force fresh data
+          const res = await fetch(
+            `${API_BASE}payment/check-discount?_t=${Date.now()}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+                "Cache-Control": "no-cache, no-store, must-revalidate", // ✅ ADD
+                Pragma: "no-cache", // ✅ ADD
+                Expires: "0", // ✅ ADD
+              },
+            }
+          );
+
+          const data = await res.json();
+          if (!res.ok) {
+            console.error("Failed to check discount:", data.message);
+            return { isEligible: false, discountPercentage: 0 };
+          }
+
+          // ✅ ADD: Log for debugging
+          console.log("✅ Discount check result:", data);
+
+          return data; // Returns { isEligible: true/false, discountPercentage: 5/0 }
+        } catch (err) {
+          console.error("Error checking discount:", err);
+          return { isEligible: false, discountPercentage: 0 };
+        }
       },
 
       createRazorpayOrder: async (amount) => {
@@ -323,11 +365,24 @@ export const useUserStore = create(
                     );
                   }
 
-                  alert("✅ Payment successful and order placed!");
+                  // ✅ FIX: Show different messages based on whether discount was applied
+                  if (
+                    verifyData.isFirstOrder &&
+                    verifyData.discountApplied > 0
+                  ) {
+                    alert(
+                      `✅ Payment successful! Welcome discount of ₹${verifyData.discountApplied} applied. Order placed!`
+                    );
+                  } else {
+                    alert("✅ Payment successful and order placed!");
+                  }
+
                   resolve({
                     success: true,
                     paymentId: response.razorpay_payment_id,
                     orderId: verifyData.orderId,
+                    discountApplied: verifyData.discountApplied,
+                    isFirstOrder: verifyData.isFirstOrder,
                   });
 
                   setTimeout(() => {
@@ -498,6 +553,26 @@ export const useUserStore = create(
           return data;
         } catch (err) {
           set({ error: err.message, loading: false });
+        }
+      },
+
+      resendOtp: async (email) => {
+        try {
+          const response = await fetch(`${API_BASE}users/resend-otp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.message || "Failed to resend OTP");
+          }
+
+          return data;
+        } catch (error) {
+          throw error;
         }
       },
     }),

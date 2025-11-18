@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const Order = require("../models/orderModel");
 const Cart = require("../models/cartModel");
 const Product = require("../models/productModel");
-const User = require("../models/userModel"); // ✅ ADD THIS
+const User = require("../models/userModel");
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -44,7 +44,7 @@ exports.createOrder = async (req, res) => {
 };
 
 // ======================================================
-// ✅ Verify Razorpay Payment - WITH FIXES
+// ✅ Verify Razorpay Payment - WITH WELCOME COUPON FIX
 // ======================================================
 exports.verifyPayment = async (req, res) => {
   try {
@@ -55,7 +55,7 @@ exports.verifyPayment = async (req, res) => {
       orderDetails,
     } = req.body;
 
-    const userId = req.user?.id || req.user?._id; // ✅ FIX: Handle both formats
+    const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     // Step 1: Verify payment signature
@@ -69,13 +69,22 @@ exports.verifyPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid payment signature" });
     }
 
-    // Step 2: Fetch user cart
+    // Step 2: Fetch user to check hasOrdered flag BEFORE processing
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // ✅ FIX: Check if user has already ordered
+    const isFirstOrder = !user.hasOrdered;
+
+    // Step 3: Fetch user cart
     const cart = await Cart.findOne({ userId }).populate("products.productId");
     if (!cart || cart.products.length === 0) {
       return res.status(400).json({ message: "Cart is empty. Cannot place order." });
     }
 
-    // Step 3: Size-wise stock validation & deduction
+    // Step 4: Size-wise stock validation & deduction
     const stockUpdates = [];
     for (const item of cart.products) {
       const product = await Product.findById(item.productId._id);
@@ -104,8 +113,7 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // Step 4: Calculate total with discount
-    const user = await User.findById(userId); // ✅ ADD: Fetch user to check hasOrdered
+    // Step 5: Calculate total with discount
     const backendTotal = cart.products.reduce(
       (sum, item) => sum + (item.productId?.price || 0) * item.quantity,
       0
@@ -114,16 +122,16 @@ exports.verifyPayment = async (req, res) => {
     const shippingCharge = 15;
     const deliveryCharge = 50;
     
-    // ✅ ADD: Apply 5% discount for first-time buyers
-    const discount = user && !user.hasOrdered ? Math.round(backendTotal * 0.05) : 0;
+    // ✅ FIX: Apply 5% discount ONLY for first-time buyers
+    const discount = isFirstOrder ? Math.round(backendTotal * 0.05) : 0;
     const finalTotal = Math.round(backendTotal + shippingCharge + deliveryCharge - discount);
 
-    // Step 5: Validate shipping address
+    // Step 6: Validate shipping address
     if (!orderDetails?.shippingAddress) {
       return res.status(400).json({ message: "Shipping address is required" });
     }
 
-    // Step 6: Create new order in DB
+    // Step 7: Create new order in DB
     const newOrder = new Order({
       user: userId,
       items: cart.products.map((item) => ({
@@ -132,10 +140,11 @@ exports.verifyPayment = async (req, res) => {
         price: item.productId.price,
         quantity: item.quantity,
         size: item.size,
-        image: item.productId.primaryImage?.url || item.productId.image, // ✅ FIX: Use primaryImage
+        image: item.productId.primaryImage?.url || item.productId.image,
       })),
       shippingAddress: orderDetails.shippingAddress,
       totalPrice: finalTotal,
+      discountApplied: discount, // ✅ ADD: Store discount in order record
       paymentMethod: "Razorpay",
       paymentStatus: "paid",
       razorpayOrderId: razorpay_order_id,
@@ -147,24 +156,25 @@ exports.verifyPayment = async (req, res) => {
 
     await newOrder.save();
 
-    // ✅ ADD: Update user's hasOrdered flag
-    if (user && !user.hasOrdered) {
+    // ✅ FIX: Update user's hasOrdered flag ONLY if it's their first order
+    if (isFirstOrder) {
       user.hasOrdered = true;
       await user.save();
     }
 
-    // Step 7: Clear cart
+    // Step 8: Clear cart
     cart.products = [];
     cart.totalPrice = 0;
     await cart.save();
 
-    // Step 8: Respond success
+    // Step 9: Respond success
     res.status(201).json({
       success: true,
       message: "Order placed successfully",
       orderId: newOrder._id,
       stockUpdates,
-      discountApplied: discount, // ✅ ADD: Send discount info to frontend
+      discountApplied: discount,
+      isFirstOrder: isFirstOrder, // ✅ ADD: Send this to frontend
     });
   } catch (error) {
     console.error("Payment verification error:", error);
@@ -177,7 +187,7 @@ exports.verifyPayment = async (req, res) => {
 };
 
 // ======================================================
-// ✅ Create Order Directly in DB (Manual Fallback) - WITH FIXES
+// ✅ Create Order Directly in DB (Manual Fallback)
 // ======================================================
 exports.createOrderInDB = async (req, res) => {
   try {
@@ -190,8 +200,14 @@ exports.createOrderInDB = async (req, res) => {
       razorpayPaymentId,
     } = req.body;
 
+    const userId = req.user?._id || req.user?.id;
+    
+    // ✅ FIX: Check if user has already ordered
+    const user = await User.findById(userId);
+    const isFirstOrder = !user.hasOrdered;
+
     const order = await Order.create({
-      userId: req.user._id,
+      userId: userId,
       items,
       shippingAddress,
       totalAmount,
@@ -202,7 +218,10 @@ exports.createOrderInDB = async (req, res) => {
       orderStatus: "processing",
     });
 
-    await User.findByIdAndUpdate(req.user._id, { hasOrdered: true });
+    // ✅ FIX: Update hasOrdered flag ONLY if it's their first order
+    if (isFirstOrder) {
+      await User.findByIdAndUpdate(userId, { hasOrdered: true });
+    }
 
     res.status(201).json({
       success: true,
@@ -214,6 +233,33 @@ exports.createOrderInDB = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error creating order in database",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// ✅ NEW: Check if user is eligible for welcome discount
+// ======================================================
+exports.checkWelcomeDiscount = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      isEligible: !user.hasOrdered,
+      discountPercentage: !user.hasOrdered ? 5 : 0,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error checking discount eligibility",
       error: error.message,
     });
   }

@@ -35,7 +35,7 @@ export default function UrbanMonkeyHeader() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
-  
+
   const [profileAnchor, setProfileAnchor] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -53,6 +53,9 @@ export default function UrbanMonkeyHeader() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // ✅ ADD: State for discount eligibility
+  const [discountInfo, setDiscountInfo] = useState({ isEligible: false, discountPercentage: 0 });
+
   const {
     user,
     isAuthenticated,
@@ -65,11 +68,29 @@ export default function UrbanMonkeyHeader() {
     saveShippingAddress,
     placeCODOrder,
     setSelectedAddress,
-    initiateRazorpayPayment
+    initiateRazorpayPayment,
+    checkWelcomeDiscount, // ✅ ADD: Import the new function
+    fetchUserProfile, // ✅ ADD: To refresh user data
   } = useUserStore();
 
   const { cartItems = [], fetchCart, updateCart, removeFromCart, clearCart } = useCartStore();
   const navigate = useNavigate();
+
+  // ✅ FIX: Check discount eligibility when cart opens or user changes
+  useEffect(() => {
+    const checkDiscount = async () => {
+      if (isAuthenticated && isCartOpen) {
+        try {
+          const info = await checkWelcomeDiscount();
+          setDiscountInfo(info);
+        } catch (err) {
+          console.error("Error checking discount:", err);
+          setDiscountInfo({ isEligible: false, discountPercentage: 0 });
+        }
+      }
+    };
+    checkDiscount();
+  }, [isAuthenticated, isCartOpen, checkWelcomeDiscount]);
 
   useEffect(() => {
     fetchCart();
@@ -260,18 +281,18 @@ export default function UrbanMonkeyHeader() {
         elevation={0}
         sx={{ borderBottom: "1px solid #e5e7eb" }}
       >
-        <Toolbar 
-          sx={{ 
-            display: "flex", 
+        <Toolbar
+          sx={{
+            display: "flex",
             justifyContent: "space-around",
             px: { xs: 1, sm: 2, md: 10 },
             minHeight: { xs: 56, sm: 64 }
           }}
         >
           {/* Left Section - Logo & Search */}
-          <Box sx={{ 
-            display: "flex", 
-            alignItems: "center", 
+          <Box sx={{
+            display: "flex",
+            alignItems: "center",
             gap: { xs: 1, md: 10 },
             flex: 1,
             minWidth: 0,
@@ -281,8 +302,8 @@ export default function UrbanMonkeyHeader() {
               <Typography
                 variant="h6"
                 noWrap
-                sx={{ 
-                  fontWeight: "bold", 
+                sx={{
+                  fontWeight: "bold",
                   color: "black",
                   fontSize: { xs: '1.8rem', md: '2rem' }
                 }}
@@ -290,7 +311,7 @@ export default function UrbanMonkeyHeader() {
                 DRIP NATION®
               </Typography>
             </Link>
-            
+
             {/* Search bar - hidden on small screens */}
             {!isTablet && (
               <Box sx={{ flex: 1, maxWidth: 500, display: { xs: 'none', md: 'block' } }}>
@@ -300,17 +321,17 @@ export default function UrbanMonkeyHeader() {
           </Box>
 
           {/* Right Section - Icons */}
-          <Box sx={{ 
-            display: "flex", 
-            gap: 5, 
+          <Box sx={{
+            display: "flex",
+            gap: 5,
             alignItems: "center",
             width: { xs: 'auto', md: '180px' },
             justifyContent: 'flex'
           }}>
             {!isAuthenticated ? (
-              <IconButton 
-                color="inherit" 
-                component={Link} 
+              <IconButton
+                color="inherit"
+                component={Link}
                 to="/auth"
               >
                 <AccountCircle />
@@ -388,15 +409,15 @@ export default function UrbanMonkeyHeader() {
               </>
             )}
 
-            <IconButton 
-              color="success" 
+            <IconButton
+              color="success"
               onClick={handleJoinWhatsApp}
             >
               <FaWhatsapp className="text-black text-3xl" />
             </IconButton>
 
-            <IconButton 
-              color="inherit" 
+            <IconButton
+              color="inherit"
               onClick={() => setIsCartOpen(true)}
             >
               <Badge badgeContent={totalItems} color="error">
@@ -405,14 +426,12 @@ export default function UrbanMonkeyHeader() {
             </IconButton>
           </Box>
         </Toolbar>
-
-        {/* Mobile Search Bar - Removed */}
       </AppBar>
 
       {/* Cart Drawer */}
-      <Drawer 
-        anchor="right" 
-        open={isCartOpen} 
+      <Drawer
+        anchor="right"
+        open={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         PaperProps={{
           sx: {
@@ -423,12 +442,12 @@ export default function UrbanMonkeyHeader() {
       >
         <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
           {/* Header */}
-          <Box sx={{ 
-            display: "flex", 
-            justifyContent: "space-between", 
-            alignItems: "center", 
-            p: { xs: 1.5, sm: 2 }, 
-            borderBottom: "1px solid #ddd" 
+          <Box sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            p: { xs: 1.5, sm: 2 },
+            borderBottom: "1px solid #ddd"
           }}>
             <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ fontWeight: 600 }}>
               {cartStep === "cart" ? `Cart (${totalItems})`
@@ -509,9 +528,9 @@ export default function UrbanMonkeyHeader() {
                               }
                             />
                           </Box>
-                          <Box sx={{ 
-                            display: "flex", 
-                            gap: { xs: 0.5, sm: 1 }, 
+                          <Box sx={{
+                            display: "flex",
+                            gap: { xs: 0.5, sm: 1 },
                             alignItems: "center",
                             ml: { xs: 0, sm: 'auto' },
                             alignSelf: { xs: 'flex-end', sm: 'center' }
@@ -623,7 +642,9 @@ export default function UrbanMonkeyHeader() {
               const totalAmount = cartItems.reduce((sum, item) => sum + item.productId.price * item.quantity, 0);
               const shippingCharge = 15;
               const deliveryCharge = 50;
-              const discount = isAuthenticated && !user?.hasOrdered ? Math.round(totalAmount * 0.05) : 0;
+
+              // ✅ FIX: Use discountInfo from state instead of user.hasOrdered
+              const discount = discountInfo.isEligible ? Math.round(totalAmount * (discountInfo.discountPercentage / 100)) : 0;
               const beforeDiscountTotal = totalAmount + shippingCharge + deliveryCharge;
               const finalAmount = Math.round(beforeDiscountTotal - discount);
 
@@ -657,7 +678,7 @@ export default function UrbanMonkeyHeader() {
                     {discount > 0 && (
                       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                         <Typography sx={{ color: "#00796b", fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-                          Welcome Coupon (5%)
+                          Welcome Coupon ({discountInfo.discountPercentage}%)
                         </Typography>
                         <Typography sx={{ color: "#00796b", fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                           -₹{discount}
@@ -679,13 +700,15 @@ export default function UrbanMonkeyHeader() {
 
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Box>
-                        <Typography sx={{
-                          color: "#888",
-                          fontSize: { xs: '0.75rem', sm: '0.9rem' },
-                          textDecoration: "line-through",
-                        }}>
-                          ₹{beforeDiscountTotal}
-                        </Typography>
+                        {discount > 0 && (
+                          <Typography sx={{
+                            color: "#888",
+                            fontSize: { xs: '0.75rem', sm: '0.9rem' },
+                            textDecoration: "line-through",
+                          }}>
+                            ₹{beforeDiscountTotal}
+                          </Typography>
+                        )}
                         <Typography sx={{
                           fontWeight: "bold",
                           fontSize: { xs: '1.25rem', sm: '1.4rem' },
@@ -750,96 +773,96 @@ export default function UrbanMonkeyHeader() {
           </Box>
 
           {/* Footer */}
-          <Box sx={{ 
-            borderTop: "1px solid #ddd", 
-            p: { xs: 1.5, sm: 2 }, 
-            display: "flex", 
-            flexDirection: "column", 
-            gap: 1 
+          <Box sx={{
+            borderTop: "1px solid #ddd",
+            p: { xs: 1.5, sm: 2 },
+            display: "flex",
+            flexDirection: "column",
+            gap: 1
           }}>
             {cartStep !== "cart" && (
-              <Button 
-                variant="outlined" 
-                fullWidth 
+              <Button
+                variant="outlined"
+                fullWidth
                 onClick={handleBack}
                 size={isMobile ? "medium" : "large"}
               >
                 ← Back
               </Button>
             )}
-            
+
             {cartStep === "cart" && cartItems.length > 0 && (
-              <Button 
-                fullWidth 
-                variant="contained" 
+              <Button
+                fullWidth
+                variant="contained"
                 size={isMobile ? "medium" : "large"}
-                sx={{ 
-                  bgcolor: "black", 
-                  "&:hover": { bgcolor: "#333" }, 
-                  py: { xs: 1, sm: 1.2 }, 
-                  fontWeight: "bold" 
-                }} 
+                sx={{
+                  bgcolor: "black",
+                  "&:hover": { bgcolor: "#333" },
+                  py: { xs: 1, sm: 1.2 },
+                  fontWeight: "bold"
+                }}
                 onClick={handleNext}
               >
                 Proceed to Review →
               </Button>
             )}
-            
+
             {cartStep === "review" && (
               <>
-                <Button 
-                  fullWidth 
-                  variant="outlined" 
+                <Button
+                  fullWidth
+                  variant="outlined"
                   size={isMobile ? "medium" : "large"}
                   onClick={() => setCartStep("address")}
                 >
                   + Add New Address
                 </Button>
-                <Button 
-                  fullWidth 
-                  variant="contained" 
+                <Button
+                  fullWidth
+                  variant="contained"
                   size={isMobile ? "medium" : "large"}
-                  sx={{ 
-                    bgcolor: "black", 
-                    "&:hover": { bgcolor: "#333" }, 
-                    py: { xs: 1, sm: 1.2 }, 
-                    fontWeight: "bold" 
+                  sx={{
+                    bgcolor: "black",
+                    "&:hover": { bgcolor: "#333" },
+                    py: { xs: 1, sm: 1.2 },
+                    fontWeight: "bold"
                   }}
-                  disabled={!selectedShippingAddressId} 
+                  disabled={!selectedShippingAddressId}
                   onClick={handleNext}
                 >
                   Continue to Payment →
                 </Button>
               </>
             )}
-            
+
             {cartStep === "address" && (
-              <Button 
-                fullWidth 
-                variant="contained" 
+              <Button
+                fullWidth
+                variant="contained"
                 size={isMobile ? "medium" : "large"}
-                sx={{ 
-                  bgcolor: "black", 
-                  "&:hover": { bgcolor: "#333" }, 
-                  py: { xs: 1, sm: 1.2 }, 
-                  fontWeight: "bold" 
-                }} 
+                sx={{
+                  bgcolor: "black",
+                  "&:hover": { bgcolor: "#333" },
+                  py: { xs: 1, sm: 1.2 },
+                  fontWeight: "bold"
+                }}
                 onClick={handleSaveNewAddress}
               >
                 Save Address
               </Button>
             )}
-            
+
             {cartStep === "payment" && (
               <Button
-                fullWidth 
+                fullWidth
                 variant="contained"
                 size={isMobile ? "medium" : "large"}
-                sx={{ 
-                  bgcolor: "black", 
-                  "&:hover": { bgcolor: "#333" }, 
-                  py: { xs: 1.2, sm: 1.5 }, 
-                  fontWeight: "bold" 
+                sx={{
+                  bgcolor: "black",
+                  "&:hover": { bgcolor: "#333" },
+                  py: { xs: 1.2, sm: 1.5 },
+                  fontWeight: "bold"
                 }}
                 onClick={async () => {
                   try {
@@ -874,11 +897,17 @@ export default function UrbanMonkeyHeader() {
 
                     if (newAddress.paymentMethod === "cod") {
                       await placeCODOrder({ items: cartItems, address: selectedAddr });
+
+                      // ✅ FIX: Refresh discount info immediately after order
+                      const updatedDiscountInfo = await checkWelcomeDiscount();
+                      setDiscountInfo(updatedDiscountInfo);
+
                       alert("✅ COD Order placed successfully!");
                       await fetchCart();
                       setIsCartOpen(false);
                       setCartStep("cart");
                       navigate("/orders");
+
                     } else if (newAddress.paymentMethod === "online") {
                       const totalAmount = cartItems.reduce(
                         (sum, item) => sum + item.productId.price * item.quantity,
@@ -886,14 +915,21 @@ export default function UrbanMonkeyHeader() {
                       );
                       const shippingCharge = 15;
                       const deliveryCharge = 50;
-                      const discount = isAuthenticated && !user?.hasOrdered
-                        ? Math.round(totalAmount * 0.05)
+
+                      const discount = discountInfo.isEligible
+                        ? Math.round(totalAmount * (discountInfo.discountPercentage / 100))
                         : 0;
                       const finalAmount = Math.round(
                         totalAmount + shippingCharge + deliveryCharge - discount
                       );
 
+                      // ✅ IMPORTANT: Wait for payment to complete
                       await initiateRazorpayPayment(finalAmount, cartItems, selectedAddr);
+
+                      // ✅ FIX: Refresh discount info after successful payment
+                      const updatedDiscountInfo = await checkWelcomeDiscount();
+                      setDiscountInfo(updatedDiscountInfo);
+
                       await fetchCart();
                       setIsCartOpen(false);
                       setCartStep("cart");

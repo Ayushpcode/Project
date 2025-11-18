@@ -21,7 +21,7 @@ function OTPContent() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const { verifyOtp, loading } = useUserStore();
+  const { verifyOtp, loading, resendOtp } = useUserStore();
 
   const searchParams = new URLSearchParams(location.search)
   const email = searchParams.get("email")
@@ -65,7 +65,6 @@ function OTPContent() {
 
     try {
       const data = await verifyOtp(email, otpString);
-      console.log("Login success:", data);
       if(data.user.role ==="admin"){
         navigate("/admin");
       }else{
@@ -96,23 +95,29 @@ function OTPContent() {
     }
   }
 
-  const handleResendOTP = () => {
-    setCountdown(15)
-    setCanResend(false)
-    setError("")
-    setOtp(["", "", "", "", "", ""])
+  const handleResendOTP = async () => {
+  try {
+    await resendOtp(email);
+    
+    setCountdown(15);
+    setCanResend(false);
+    setError("");
+    setOtp(["", "", "", "", "", ""]);
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          setCanResend(true)
-          clearInterval(timer)
-          return 0
+          setCanResend(true);
+          clearInterval(timer);
+          return 0;
         }
-        return prev - 1
-      })
-    }, 1000)
+        return prev - 1;
+      });
+    }, 1000);
+  } catch (err) {
+    setError(err.message || "Failed to resend OTP");
   }
+};
 
   return (
     <Box className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
@@ -172,7 +177,7 @@ function OTPContent() {
               {loading ? "Verifying..." : "Verify OTP"}
             </Button>
 
-            <Box textAlign="center" mt={2}>
+             <Box textAlign="center" mt={2}>
               <Typography variant="body2" color="text.secondary">
                 Didn't receive the code?
               </Typography>
@@ -184,7 +189,7 @@ function OTPContent() {
               >
                 {canResend ? "Resend OTP" : `Resend in ${countdown}s`}
               </Button>
-            </Box>
+            </Box> 
           </form>
         </CardContent>
       </Card>
